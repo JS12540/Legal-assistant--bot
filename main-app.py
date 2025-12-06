@@ -3,6 +3,7 @@ import time
 import streamlit as st
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
 ## LangChain dependencies
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -24,9 +25,9 @@ def main():
     ## setting up env
     load_dotenv()
 
-    ## setting up file paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    persistent_directory = os.path.join(current_dir, "data-ingestion-local")
+    ## setting up file paths using pathlib
+    current_dir = Path(__file__).parent.resolve()
+    persistent_directory = current_dir / "data-ingestion-local"
 
     ## setting-up the LLM
     # Load API key from environment variables for security
@@ -51,7 +52,7 @@ def main():
     ## loading the vector database from local using FAISS instead of Chroma
     # allow_dangerous_deserialization=True is required for loading FAISS indexes that may contain
     # custom objects. Ensure the source of the serialized data is trusted.
-    vectorDB = FAISS.load_local(persistent_directory, embedF, allow_dangerous_deserialization=True)
+    vectorDB = FAISS.load_local(str(persistent_directory), embedF, allow_dangerous_deserialization=True)
 
     ## setting up the retriever
     kb_retriever = vectorDB.as_retriever(search_type="similarity", search_kwargs={"k": 3})
@@ -138,31 +139,29 @@ def main():
 
         with st.chat_message("assistant"):
             with st.status("Generating 💡...", expanded=True):
-                ## invoking the chain to fetch the result
-                result = coversational_rag_chain.invoke({"input": user_query, "chat_history": st.session_state['messages']})
-
-                message_placeholder = st.empty()
-
-                full_response = (
+                full_response_prefix = (
                     "⚠️ **_This information is not intended as a substitute for legal advice. "
                     "We recommend consulting with an attorney for a more comprehensive and"
                     " tailored response._** \n\n\n"
                 )
+                st.write(full_response_prefix)
 
-            ## displaying the output on the dashboard
-            # result["answer"] is typically a string, iterating over it displays character by character
-            for chunk in result["answer"]:
-                full_response += chunk
-                time.sleep(0.02) ## <- simulate the output feeling of ChatGPT
+                # Generator function to stream chunks from the RAG chain
+                def get_rag_response_stream(query, chat_history):
+                    for chunk in coversational_rag_chain.stream({"input": query, "chat_history": chat_history}):
+                        if "answer" in chunk:
+                            yield chunk["answer"]
 
-                message_placeholder.markdown(full_response + " ▌")
+                # Use st.write_stream for true streaming of the LLM response
+                full_answer_content = st.write_stream(get_rag_response_stream(user_query, st.session_state['messages']))
+
             st.button('Reset Conversation 🗑️', on_click=reset_conversation)
 
         ## appending conversation turns
         st.session_state.messages.extend(
             [
                 HumanMessage(content=user_query),
-                AIMessage(content=result['answer'])
+                AIMessage(content=full_answer_content) # Store the full concatenated answer
             ]
         )
 
