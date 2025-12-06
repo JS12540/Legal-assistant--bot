@@ -12,8 +12,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain_core.documents import Document
 
+# Constants
+EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
-def main():
+
+def main() -> None:
     ## setting up directories
     # Using pathlib for modern path handling
     current_dir_path: Path = Path(__file__).parent
@@ -22,7 +25,7 @@ def main():
 
     ## checking if the directory already exists
     if not persistent_directory.exists():
-        print("[INFO] Initiating the build of Vector Database .. 📌📌", end="\n\n")
+        print("[INFO] Initiating the build of Vector Database .. 📌📌\n")
 
         ## checking if the folder that contains the required PDFs exists
         if not data_path.exists():
@@ -49,12 +52,12 @@ def main():
         docs_split: list[Document] = splitter.split_documents(documents=doc_container)
 
         ## displaying information about the split documents
-        print("\n--- Document Chunks Information ---", end="\n")
-        print(f"Number of document chunks: {len(docs_split)}", end="\n\n")
+        print("\n--- Document Chunks Information ---")
+        print(f"Number of document chunks: {len(docs_split)}\n")
 
         ## embedding and vector store
-        embedF = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2") ## <- open-source embedding model from HuggingFace - taking the default model only
-        print("[INFO] Started embedding", end="\n")
+        embedF = HuggingFaceEmbeddings(model_name = EMBEDDING_MODEL_NAME)
+        print("[INFO] Started embedding")
         start = time.time() ## <- noting the starting time
 
         """
@@ -65,10 +68,10 @@ def main():
                                        embedding=embedF)
         
         # Save the FAISS index locally
-        vectorDB.save_local(str(persistent_directory)) # save_local expects a string path
+        vectorDB.save_local(str(persistent_directory))
         
         end = time.time() ## <- noting the end time
-        print("[INFO] Finished embedding", end="\n")
+        print("[INFO] Finished embedding")
         print(f"[ADD. INFO] Time taken: {end - start} seconds")
 
     else:
