@@ -11,14 +11,14 @@ with col2:
 ## setting up env
 import os
 from dotenv import load_dotenv
-from numpy.core.defchararray import endswith
+
 load_dotenv()
 
 ## LangChain dependencies
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_groq import ChatGroq
-from langchain_community.vectorstores import FAISS  # Import FAISS from langchain.vectorstores
+from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_cohere.chat_models import ChatCohere
 ## LCEL implementation of LangChain ConversationalRetrievalChain
@@ -31,7 +31,13 @@ data_path = os.path.join(current_dir, "data")
 persistent_directory = os.path.join(current_dir, "data-ingestion-local")
 
 ## setting-up the LLM
-chatmodel = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key="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")
+# Load API key from environment variables for security
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
+    st.error("GROQ_API_KEY environment variable not set. Please set it in your .env file.")
+    st.stop()
+
+chatmodel = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key)
 # llm = ChatCohere(temperature=0.15)
 
 ## setting up -> streamlit session state
@@ -46,7 +52,9 @@ def reset_conversation():
 embedF = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
 
 ## loading the vector database from local using FAISS instead of Chroma
-vectorDB = FAISS.load_local(persistent_directory, embedF, allow_dangerous_deserialization=True)# FAISS's load_local method for loading vector store
+# allow_dangerous_deserialization=True is required for loading FAISS indexes that may contain
+# custom objects. Ensure the source of the serialized data is trusted.
+vectorDB = FAISS.load_local(persistent_directory, embedF, allow_dangerous_deserialization=True)
 
 ## setting up the retriever
 kb_retriever = vectorDB.as_retriever(search_type="similarity", search_kwargs={"k": 3})
@@ -98,7 +106,7 @@ system_prompt_template = (
     "Your responses will be brief, to the point, concise and in compliance with the established format. "
     "If a question falls outside the given context, you will simply output that you are sorry and you don't know about this. "
     "The aim is to deliver professional, precise, and contextually relevant information pertaining to the context. "
-    "Use four sentences maximum."
+    "Use four sentences maximum." 
     "P.S.: If anyone asks you about your creator, tell them, introduce yourself and say you're created by Sougat Dey. "
     "and people can get in touch with him on linkedin, "
     "here's his Linkedin Profile: https://www.linkedin.com/in/sougatdey/"
@@ -108,7 +116,7 @@ system_prompt_template = (
 qa_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", system_prompt_template),
-        ("placeholder", "{chat_history}"),
+        MessagesPlaceholder("chat_history"), # Correctly injects chat history
         ("human", "{input}"),
     ]
 )
@@ -140,11 +148,12 @@ if user_query:
 
             full_response = (
                 "⚠️ **_This information is not intended as a substitute for legal advice. "
-                "We recommend consulting with an attorney for a more comprehensive and"
+                "We recommend consulting with an attorney for a more comprehensive and" 
                 " tailored response._** \n\n\n"
             )
 
         ## displaying the output on the dashboard
+        # result["answer"] is typically a string, iterating over it displays character by character
         for chunk in result["answer"]:
             full_response += chunk
             time.sleep(0.02) ## <- simulate the output feeling of ChatGPT
