@@ -1,78 +1,80 @@
 import time
-import os
-from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv()
+from dotenv import load_dotenv
 
-## langchain dependencies
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
+
+load_dotenv()
 
 # Constants
 EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
 
 def main() -> None:
-    ## setting up directories
-    # Using pathlib for modern path handling
+    """
+    Main function to build or check the Vector Database.
+    It loads PDF documents, splits them into chunks,
+    embeds them using a HuggingFace model, and stores them in a FAISS vector database.
+    """
+    # Setting up directories
     current_dir_path: Path = Path(__file__).parent
     data_path: Path = current_dir_path / "data"
     persistent_directory: Path = current_dir_path / "data-ingestion-local"
 
-    ## checking if the directory already exists
+    # Checking if the directory already exists
     if not persistent_directory.exists():
         print("[INFO] Initiating the build of Vector Database .. 📌📌\n")
 
-        ## checking if the folder that contains the required PDFs exists
+        # Checking if the folder that contains the required PDFs exists
         if not data_path.exists():
-            raise FileNotFoundError(
-                f"[ALERT] {data_path} doesn't exist. ⚠️⚠️"
-            )
+            raise FileNotFoundError(f"[ALERT] {data_path} doesn't exist. ⚠️⚠️")
 
-        ## list of all the PDFs
-        # Using pathlib's iterdir and suffix for listing PDFs
+        # List of all the PDFs
         pdfs: list[Path] = [p for p in data_path.iterdir() if p.suffix == ".pdf"]
 
-        doc_container: list[Document] = [] ## <- list of chunked documents aka container
-        
-        ## taking each item from `pdfs` and loading it using PyPDFLoader
-        for pdf_path in pdfs: # Renamed 'pdf' to 'pdf_path' for clarity
-            loader = PyPDFLoader(file_path=str(pdf_path), # PyPDFLoader expects a string path
-                                 extract_images=False)
-            docsRaw: list[Document] = loader.load() ## <- returns a list of `Document` objects. Each such object has - 1. Page Content // 2. Metadata
-            for doc in docsRaw:
-                doc_container.append(doc) ## <- appending each `Document` object to the previously declared container (list)
+        doc_container: list[Document] = []  # Container for chunked documents
 
-        ## splitting the document into chunks
+        # Taking each item from `pdfs` and loading it using PyPDFLoader
+        for pdf_path in pdfs:
+            loader = PyPDFLoader(
+                file_path=str(pdf_path),  # PyPDFLoader expects a string path
+                extract_images=False,
+            )
+            # Returns a list of `Document` objects. Each such object has - 1. Page Content // 2. Metadata
+            docs_raw: list[Document] = loader.load()
+            # Appending each `Document` object to the previously declared container (list)
+            doc_container.extend(docs_raw)
+
+        # Splitting the document into chunks
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
         docs_split: list[Document] = splitter.split_documents(documents=doc_container)
 
-        ## displaying information about the split documents
+        # Displaying information about the split documents
         print("\n--- Document Chunks Information ---")
         print(f"Number of document chunks: {len(docs_split)}\n")
 
-        ## embedding and vector store
-        embedF = HuggingFaceEmbeddings(model_name = EMBEDDING_MODEL_NAME)
+        # Embedding and vector store
+        embed_func = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
         print("[INFO] Started embedding")
-        start = time.time() ## <- noting the starting time
+        start_time = time.time()  # Noting the starting time
 
         """
         Creating the embeddings for the documents and
         then storing them in a FAISS vector database
         """
-        vectorDB = FAISS.from_documents(documents=docs_split,
-                                       embedding=embedF)
-        
+        vector_db = FAISS.from_documents(documents=docs_split, embedding=embed_func)
+
         # Save the FAISS index locally
-        vectorDB.save_local(str(persistent_directory))
-        
-        end = time.time() ## <- noting the end time
+        vector_db.save_local(str(persistent_directory))
+
+        end_time = time.time()  # Noting the end time
         print("[INFO] Finished embedding")
-        print(f"[ADD. INFO] Time taken: {end - start} seconds")
+        print(f"[ADD. INFO] Time taken: {end_time - start_time:.2f} seconds")
 
     else:
         print("[ALERT] Vector Database already exists. ⚠️⚠️")
