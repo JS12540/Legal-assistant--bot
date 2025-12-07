@@ -1,68 +1,72 @@
-## functional dependencies
-import time
-import streamlit as st
 import os
-from dotenv import load_dotenv
+import time
 from pathlib import Path
+from typing import Generator
 
-## LangChain dependencies
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_groq import ChatGroq
+import streamlit as st
+from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.chains import (  # type: ignore
+    create_history_aware_retriever,
+    create_retrieval_chain,
+)
+from langchain.chains.combine_documents import create_stuff_documents_chain  # type: ignore
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-## LCEL implementation of LangChain ConversationalRetrievalChain
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 
-def main():
-    ## initializing the UI
+
+def main() -> None:
+    """Main function to run the RAG-Based Legal Assistant Streamlit application."""
+    # Initializing the UI
     st.set_page_config(page_title="RAG-Based Legal Assistant")
-    col1, col2, col3 = st.columns([1, 25, 1])
+    _, col2, _ = st.columns([1, 25, 1])
     with col2:
         st.title("RAG-Based Legal Assistant")
 
-    ## setting up env
+    # Setting up environment variables
     load_dotenv()
 
-    ## setting up file paths using pathlib
+    # Setting up file paths using pathlib
     current_dir = Path(__file__).parent.resolve()
     persistent_directory = current_dir / "data-ingestion-local"
 
-    ## setting-up the LLM
-    # Load API key from environment variables for security
+    # Setting up the LLM
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
         st.error("GROQ_API_KEY environment variable not set. Please set it in your .env file.")
         st.stop()
 
-    chatmodel = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key)
+    chat_model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key)
 
-    ## setting up -> streamlit session state
+    # Setting up Streamlit session state
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    # resetting the entire conversation
-    def reset_conversation():
-        st.session_state['messages'] = []
+    def reset_conversation() -> None:
+        """Resets the entire conversation history in the session state."""
+        st.session_state["messages"] = []
 
-    ## open-source embedding model from HuggingFace - taking the default model only
-    embedF = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
+    # Open-source embedding model from HuggingFace
+    embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    ## loading the vector database from local using FAISS instead of Chroma
+    # Loading the vector database from local using FAISS
     # allow_dangerous_deserialization=True is required for loading FAISS indexes that may contain
     # custom objects. Ensure the source of the serialized data is trusted.
-    vectorDB = FAISS.load_local(str(persistent_directory), embedF, allow_dangerous_deserialization=True)
+    vector_db = FAISS.load_local(
+        str(persistent_directory), embeddings_model, allow_dangerous_deserialization=True
+    )
 
-    ## setting up the retriever
-    kb_retriever = vectorDB.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    # Setting up the retriever
+    knowledge_base_retriever = vector_db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
-    ## initiating the history_aware_retriever
+    # Initiating the history_aware_retriever
     rephrasing_template = (
         """
         TASK: Convert context-dependent questions into standalone queries.
 
-        INPUT: 
+        INPUT:
         - chat_history: Previous messages
         - question: Current user query
 
@@ -90,12 +94,12 @@ def main():
     )
 
     history_aware_retriever = create_history_aware_retriever(
-        llm=chatmodel,
-        retriever=kb_retriever,
-        prompt=rephrasing_prompt
+        llm=chat_model,
+        retriever=knowledge_base_retriever,
+        prompt=rephrasing_prompt,
     )
 
-    ## setting-up the document chain
+    # Setting up the document chain
     system_prompt_template = (
         "As a Legal Assistant Chatbot specializing in legal queries, "
         "your primary objective is to provide accurate and concise information based on user queries. "
@@ -114,19 +118,19 @@ def main():
     qa_prompt = ChatPromptTemplate.from_messages(
         [
             ("system", system_prompt_template),
-            MessagesPlaceholder("chat_history"), # Correctly injects chat history
+            MessagesPlaceholder("chat_history"),  # Correctly injects chat history
             ("human", "{input}"),
         ]
     )
 
-    qa_chain = create_stuff_documents_chain(chatmodel, qa_prompt)
+    qa_chain = create_stuff_documents_chain(chat_model, qa_prompt)
 
-    ## final RAG chain
-    coversational_rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
+    # Final RAG chain
+    conversational_rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
 
-    ## setting-up conversational UI
+    # Setting up conversational UI
 
-    ## printing all (if any) messages in the session_session `message` key
+    # Printing all (if any) messages in the session_session `message` key
     for message in st.session_state.messages:
         with st.chat_message(message.type):
             st.write(message.content)
@@ -141,29 +145,33 @@ def main():
             with st.status("Generating 💡...", expanded=True):
                 full_response_prefix = (
                     "⚠️ **_This information is not intended as a substitute for legal advice. "
-                    "We recommend consulting with an attorney for a more comprehensive and"
+                    "We recommend consulting with an attorney for a more comprehensive and" 
                     " tailored response._** \n\n\n"
                 )
                 st.write(full_response_prefix)
 
-                # Generator function to stream chunks from the RAG chain
-                def get_rag_response_stream(query, chat_history):
-                    for chunk in coversational_rag_chain.stream({"input": query, "chat_history": chat_history}):
+                def get_rag_response_stream(
+                    query: str, chat_history: list[HumanMessage | AIMessage | SystemMessage]
+                ) -> Generator[str, None, None]:
+                    """Generator function to stream chunks from the RAG chain."""
+                    for chunk in conversational_rag_chain.stream(
+                        {"input": query, "chat_history": chat_history}
+                    ):
                         if "answer" in chunk:
                             yield chunk["answer"]
 
                 # Use st.write_stream for true streaming of the LLM response
-                full_answer_content = st.write_stream(get_rag_response_stream(user_query, st.session_state['messages']))
+                full_answer_content = st.write_stream(
+                    get_rag_response_stream(user_query, st.session_state["messages"])
+                )
 
-            st.button('Reset Conversation 🗑️', on_click=reset_conversation)
+            st.button("Reset Conversation 🗑️", on_click=reset_conversation)
 
-        ## appending conversation turns
+        # Appending conversation turns
         st.session_state.messages.extend(
-            [
-                HumanMessage(content=user_query),
-                AIMessage(content=full_answer_content) # Store the full concatenated answer
-            ]
+            [HumanMessage(content=user_query), AIMessage(content=full_answer_content)]
         )
+
 
 if __name__ == "__main__":
     main()
