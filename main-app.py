@@ -1,5 +1,4 @@
 import os
-import time
 from pathlib import Path
 from typing import Generator
 
@@ -145,7 +144,7 @@ def main() -> None:
             with st.status("Generating 💡...", expanded=True):
                 full_response_prefix = (
                     "⚠️ **_This information is not intended as a substitute for legal advice. "
-                    "We recommend consulting with an attorney for a more comprehensive and" 
+                    "We recommend consulting with an attorney for a more comprehensive and"
                     " tailored response._** \n\n\n"
                 )
                 st.write(full_response_prefix)

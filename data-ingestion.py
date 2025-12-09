@@ -2,10 +2,9 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -28,7 +27,7 @@ def main() -> None:
 
     # Checking if the directory already exists
     if not persistent_directory.exists():
-        print("[INFO] Initiating the build of Vector Database .. 📌📌\n")
+        print("[INFO] Initiating the build of Vector Database .. 📍📍\n")
 
         # Checking if the folder that contains the required PDFs exists
         if not data_path.exists():
