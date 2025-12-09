@@ -7,7 +7,7 @@ langchain-groq==1.1.0
 langchain-huggingface==1.1.0
 langchain-text-splitters==1.0.0
 langsmith==0.4.56
-pypdf==6.4.0
-numpy==2.3.5
+pypdf==4.2.0
+numpy==1.26.4
 streamlit==1.52.1
 faiss-cpu==1.13.1

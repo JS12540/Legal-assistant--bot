@@ -4,16 +4,17 @@ from typing import Generator
 
 import streamlit as st
 from dotenv import load_dotenv
+
+from langchain.chains import (
+    create_history_aware_retriever,
+    create_retrieval_chain,
+)
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.vectorstores import FAISS
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.chains import (  # type: ignore
-    create_history_aware_retriever,
-    create_retrieval_chain,
-)
-from langchain.chains.combine_documents import create_stuff_documents_chain  # type: ignore
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
 def main() -> None:
@@ -51,8 +52,11 @@ def main() -> None:
     embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
     # Loading the vector database from local using FAISS
-    # allow_dangerous_deserialization=True is required for loading FAISS indexes that may contain
-    # custom objects. Ensure the source of the serialized data is trusted.
+    # CRITICAL SECURITY NOTE: allow_dangerous_deserialization=True is used.
+    # This is required for loading FAISS indexes that may contain custom objects.
+    # Ensure the source of the serialized data (the 'data-ingestion-local' directory)
+    # is absolutely trusted and not modifiable by untrusted parties, as it can lead
+    # to arbitrary code execution if malicious objects are deserialized.
     vector_db = FAISS.load_local(
         str(persistent_directory), embeddings_model, allow_dangerous_deserialization=True
     )
