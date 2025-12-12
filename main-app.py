@@ -5,10 +5,7 @@ from typing import Generator
 import streamlit as st
 from dotenv import load_dotenv
 
-from langchain.chains import (
-    create_history_aware_retriever,
-    create_retrieval_chain,
-)
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.vectorstores import FAISS
@@ -35,7 +32,9 @@ def main() -> None:
     # Setting up the LLM
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
-        st.error("GROQ_API_KEY environment variable not set. Please set it in your .env file.")
+        st.error(
+            "GROQ_API_KEY environment variable not set. Please set it in your .env file."
+        )
         st.stop()
 
     chat_model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key)
@@ -58,15 +57,14 @@ def main() -> None:
     # is absolutely trusted and not modifiable by untrusted parties, as it can lead
     # to arbitrary code execution if malicious objects are deserialized.
     vector_db = FAISS.load_local(
-        str(persistent_directory), embeddings_model, allow_dangerous_deserialization=True
+        persistent_directory, embeddings_model, allow_dangerous_deserialization=True
     )
 
     # Setting up the retriever
     knowledge_base_retriever = vector_db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
     # Initiating the history_aware_retriever
-    rephrasing_template = (
-        """
+    rephrasing_template = """
         TASK: Convert context-dependent questions into standalone queries.
 
         INPUT:
@@ -86,7 +84,6 @@ def main() -> None:
         Question: "How do I use it?"
         Returns: "How do I use Python?"
         """
-    )
 
     rephrasing_prompt = ChatPromptTemplate.from_messages(
         [
@@ -111,7 +108,7 @@ def main() -> None:
         "Your responses will be brief, to the point, concise and in compliance with the established format. "
         "If a question falls outside the given context, you will simply output that you are sorry and you don't know about this. "
         "The aim is to deliver professional, precise, and contextually relevant information pertaining to the context. "
-        "Use four sentences maximum." 
+        "Use four sentences maximum."
         "P.S.: If anyone asks you about your creator, tell them, introduce yourself and say you're created by Sougat Dey. "
         "and people can get in touch with him on linkedin, "
         "here's his Linkedin Profile: https://www.linkedin.com/in/sougatdey/"
@@ -154,7 +151,8 @@ def main() -> None:
                 st.write(full_response_prefix)
 
                 def get_rag_response_stream(
-                    query: str, chat_history: list[HumanMessage | AIMessage | SystemMessage]
+                    query: str,
+                    chat_history: list[HumanMessage | AIMessage | SystemMessage],
                 ) -> Generator[str, None, None]:
                     """Generator function to stream chunks from the RAG chain."""
                     for chunk in conversational_rag_chain.stream(
