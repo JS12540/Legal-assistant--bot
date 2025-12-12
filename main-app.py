@@ -4,11 +4,7 @@ from typing import Generator
 
 import streamlit as st
 from dotenv import load_dotenv
-
-from langchain.chains import (
-    create_history_aware_retriever,
-    create_retrieval_chain,
-)
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.vectorstores import FAISS
@@ -35,10 +31,14 @@ def main() -> None:
     # Setting up the LLM
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
-        st.error("GROQ_API_KEY environment variable not set. Please set it in your .env file.")
+        st.error(
+            "GROQ_API_KEY environment variable not set. Please set it in your .env file."
+        )
         st.stop()
 
-    chat_model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key)
+    chat_model = ChatGroq(
+        model="llama-3.1-8b-instant", temperature=0.15, api_key=groq_api_key
+    )
 
     # Setting up Streamlit session state
     if "messages" not in st.session_state:
@@ -62,7 +62,9 @@ def main() -> None:
     )
 
     # Setting up the retriever
-    knowledge_base_retriever = vector_db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    knowledge_base_retriever = vector_db.as_retriever(
+        search_type="similarity", search_kwargs={"k": 3}
+    )
 
     # Initiating the history_aware_retriever
     rephrasing_template = (
@@ -148,7 +150,7 @@ def main() -> None:
             with st.status("Generating 💡...", expanded=True):
                 full_response_prefix = (
                     "⚠️ **_This information is not intended as a substitute for legal advice. "
-                    "We recommend consulting with an attorney for a more comprehensive and"
+                    "We recommend consulting with an attorney for a more comprehensive and" 
                     " tailored response._** \n\n\n"
                 )
                 st.write(full_response_prefix)
