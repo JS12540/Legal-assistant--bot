@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -31,15 +31,19 @@ def main() -> None:
 
         # Checking if the folder that contains the required PDFs/DOCX files exists
         if not data_path.exists():
-            raise FileNotFoundError(f"[ALERT] {data_path} doesn't exist. \u26a0\ufe0f\u26a0\ufe0f")
+            raise FileNotFoundError(
+                f"[ALERT] {data_path} doesn't exist. \u26a0\ufe0f\u26a0\ufe0f"
+            )
 
         # List of all the PDFs and DOCX files
         documents_to_process: list[Path] = [
-            p for p in data_path.iterdir() if p.suffix == ".pdf" or p.suffix == ".docx"
+            p for p in data_path.iterdir() if p.suffix in (".pdf", ".docx")
         ]
 
         if not documents_to_process:
-            print(f"[ALERT] No .pdf or .docx files found in {data_path}. \u26a0\ufe0f\u26a0\ufe0f")
+            print(
+                f"[ALERT] No .pdf or .docx files found in {data_path}. \u26a0\ufe0f\u26a0\ufe0f"
+            )
             return
 
         doc_container: list[Document] = []  # Container for chunked documents
@@ -66,7 +70,9 @@ def main() -> None:
             doc_container.extend(docs_raw)
 
         if not doc_container:
-            print("[ALERT] No content was loaded from the documents. Vector DB not built. \u26a0\ufe0f")
+            print(
+                "[ALERT] No content was loaded from the documents. Vector DB not built. \u26a0\ufe0f"
+            )
             return
 
         # Splitting the document into chunks
